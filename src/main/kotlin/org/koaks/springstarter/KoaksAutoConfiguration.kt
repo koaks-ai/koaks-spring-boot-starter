@@ -6,6 +6,7 @@ import org.koaks.framework.api.chat.completions.ChatClient
 import org.koaks.framework.api.dsl.createChatClient
 import org.koaks.framework.memory.IMemoryStorage
 import org.springframework.beans.factory.BeanFactory
+
 import org.springframework.boot.autoconfigure.AutoConfiguration
 import org.springframework.boot.autoconfigure.AutoConfigurationPackages
 import org.springframework.boot.context.properties.EnableConfigurationProperties
@@ -17,8 +18,8 @@ import org.springframework.context.annotation.Bean
 @EnableConfigurationProperties(KoaksProperties::class)
 class KoaksAutoConfiguration(
     private val beanFactory: BeanFactory,
-    private val koaksProperties: KoaksProperties,
-    private val applicationContext: ApplicationContext
+    private val applicationContext: ApplicationContext,
+    private val properties: KoaksProperties
 ) {
 
     @PostConstruct
@@ -35,32 +36,35 @@ class KoaksAutoConfiguration(
     }
 
     @Bean
-    fun chatClients(): Map<String, ChatClient> {
-        if (koaksProperties.clients.isEmpty()) {
-            return emptyMap()
+    fun chatClient(): ChatClient {
+        require(!properties.apikey.isNullOrBlank()) {
+            "koaks.clients: 'apikey' must not be empty for client '${properties.name}'"
+        }
+        require(!properties.baseurl.isNullOrBlank()) {
+            "koaks.clients: 'baseurl' must not be empty for client '${properties.name}'"
+        }
+        require(!properties.modelName.isNullOrBlank()) {
+            "koaks.clients: 'modelName' must not be empty for client '${properties.name}'"
         }
 
-        return koaksProperties.clients.associate { clientProps ->
-            clientProps.name to createChatClient {
-                model {
-                    baseUrl = clientProps.baseurl
-                    apiKey = clientProps.apikey
-                    modelName = clientProps.modelName
-                }
-                memory {
-                    val beans = applicationContext.getBeansOfType(IMemoryStorage::class.java)
-                    if (beans.isEmpty()) {
-                        default()
-                    } else {
-                        custom(beans.values.first())
-                    }
-                }
-                tools {
+        return createChatClient {
+            model {
+                baseUrl = properties.baseurl
+                apiKey = properties.apikey
+                modelName = properties.modelName
+            }
+            memory {
+                val beans = applicationContext.getBeansOfType(IMemoryStorage::class.java)
+                if (beans.isEmpty()) {
                     default()
-                    val toolGroups = clientProps.toolGroups
-                    if (toolGroups != null) {
-                        groups(*toolGroups.toTypedArray())
-                    }
+                } else {
+                    custom(beans.values.first())
+                }
+            }
+            tools {
+                default()
+                properties.toolGroups?.let {
+                    groups(*it.toTypedArray())
                 }
             }
         }
