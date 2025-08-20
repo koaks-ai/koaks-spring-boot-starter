@@ -49,7 +49,7 @@ class KoaksAutoConfiguration(
                 }
                 memory {
                     val beans = applicationContext.getBeansOfType(IMemoryStorage::class.java)
-                    if (beans.isNotEmpty()) {
+                    if (beans.isEmpty()) {
                         default()
                     } else {
                         custom(beans.values.first())
